@@ -99,19 +99,35 @@ public class Service {
     public void addAddress(AddressDTO address) {
         // ADDRESS_HASH has a unique constraint
         try {
-            pst = con.prepareStatement("insert into address (ADDRESS_ID,ADDRESS_HASH,MINER_ADDRESS,MINING_POOL_ADDRESS,CLUSTER) values (?,?,?,?,?)");
+            pst = con.prepareStatement("insert into address (ADDRESS_ID,ADDRESS_HASH,MINER_ADDRESS,MINING_POOL_ADDRESS,ADDRESS_TYPE,CLUSTER) values (?,?,?,?,?,?)");
             pst.setLong(1,address_count);
             pst.setString(2,address.getAddress_hash());
             pst.setBoolean(3,address.isMiner_address());
             pst.setBoolean(4,address.isMiningPoolAddress());
-            if(address.getCluster_id() != null)
-                pst.setLong(5,address.getCluster_id());
-            else
-                pst.setNull(5,Types.BIGINT);
+
+            short type = getType(address.getAddress_hash());
+            if(type != -1) pst.setShort(5,type);
+            else pst.setNull(5,Types.SMALLINT);
+
+            if(address.getCluster_id() != null) pst.setLong(6,address.getCluster_id());
+            else pst.setNull(6,Types.BIGINT);
+
             pst.executeUpdate();
             address_count++;
         } catch (SQLException e) {
             // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Address already exists!");
         }
+    }
+
+    private short getType(String hash) {
+        // Legacy Address (P2PKH)
+        if(hash.startsWith("1")) return 0;
+        // Pay to Script Hash (P2SH)
+        if(hash.startsWith("3")) return 1;
+        // Native SegWit (P2WPKH)
+        if(hash.startsWith("bc1q")) return 2;
+        // Taproot (P2TR)
+        if(hash.startsWith("bc1p")) return 3;
+        return -1;
     }
 }
