@@ -83,8 +83,6 @@ public class Controller {
                         minerAddress.setCluster_id(cluster_id_counter);
                         // Update ID counter
                         cluster_id_counter++;
-                        // Save cluster and address
-                        service.addCluster(clusterDTO);
                         service.addAddress(minerAddress);
                     } else {
                         // Update the actual object with the existing one by address hash
@@ -98,8 +96,6 @@ public class Controller {
                             minerAddress.setCluster_id(cluster_id_counter);
                             // Update ID counter
                             cluster_id_counter++;
-                            // Save cluster and update address
-                            service.addCluster(clusterDTO);
                             service.updateAddressCluster(clusterDTO.getCluster_id(), minerAddress.getAddress_hash());
                         }
                     }
@@ -203,8 +199,6 @@ public class Controller {
                     tempAddressDTO.setCluster_id(cluster_id_counter);
                     // Update ID counter
                     cluster_id_counter++;
-                    // Save cluster and address
-                    service.addCluster(multi_input_cluster);
                     service.addAddress(tempAddressDTO);
                 } else {
                     // Update the actual object with the existing one by address hash
@@ -218,8 +212,6 @@ public class Controller {
                         tempAddressDTO.setCluster_id(cluster_id_counter);
                         // Update ID counter
                         cluster_id_counter++;
-                        // Save cluster and update address
-                        service.addCluster(multi_input_cluster);
                         service.updateAddressCluster(multi_input_cluster.getCluster_id(), tempAddressDTO.getAddress_hash());
                     }
                 }
@@ -272,8 +264,6 @@ public class Controller {
                     cluster_mining_pool.setCluster_id(cluster_id_counter);
                     // Update cluster ID
                     cluster_id_counter++;
-                    // Upload cluster on DB
-                    service.addCluster(cluster_mining_pool);
                     // Activate flag
                     mining_pool_tx = true;
                     break;
@@ -380,7 +370,7 @@ public class Controller {
                     // Unify clusters: for each address in the old cluster -> Set the new cluster ID
                     service.updateAddressList(cluster_mining_pool.getCluster_id(), tempAddressDTO.getCluster_id());
                     // Set all address of the old cluster as mining pool addresses
-                    service.updateClusterMiningPool(cluster_mining_pool, true);
+                    service.updateClusterMiningPool(cluster_mining_pool.getCluster_id(), true);
                 }
             } else service.addAddress(tempAddressDTO); // Add address without cluster
         }
@@ -406,8 +396,6 @@ public class Controller {
                     miniCluster.setCluster_id(cluster_id_counter);
                     // Update cluster ID
                     cluster_id_counter++;
-                    // Upload cluster on DB
-                    service.addCluster(miniCluster);
                     service.updateAddressCluster(miniCluster.getCluster_id(), change_hash);
                     service.updateAddressCluster(miniCluster.getCluster_id(), inputAddressList.get(0));
                 }
@@ -422,7 +410,7 @@ public class Controller {
                 // Add the only input address to the mining-pool cluster
                 service.updateAddressCluster(cluster_mining_pool.getCluster_id(), inputAddressList.get(0));
             // Set all the new addresses in the cluster as mining pool addresses
-            service.updateClusterMiningPool(cluster_mining_pool, true);
+            service.updateClusterMiningPool(cluster_mining_pool.getCluster_id(), true);
         }
     }
 }

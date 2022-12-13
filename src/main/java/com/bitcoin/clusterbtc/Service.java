@@ -1,7 +1,6 @@
 package com.bitcoin.clusterbtc;
 
 import com.bitcoin.clusterbtc.dto.AddressDTO;
-import com.bitcoin.clusterbtc.dto.ClusterDTO;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -86,11 +85,11 @@ public class Service {
         }
     }
 
-    public void updateClusterMiningPool(ClusterDTO clusterDTO, boolean mining_pool) {
+    public void updateClusterMiningPool(Long clusterID, boolean mining_pool) {
         try {
             pst = con.prepareStatement("update ADDRESS set MINING_POOL_ADDRESS = ? where CLUSTER = ?");
             pst.setBoolean(1, mining_pool);
-            pst.setLong(2, clusterDTO.getCluster_id());
+            pst.setLong(2, clusterID);
             pst.executeUpdate();
         } catch (SQLException ex) {
             Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot update mining_pool columns in address!");
@@ -113,17 +112,6 @@ public class Service {
             address_count++;
         } catch (SQLException e) {
             // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Address already exists!");
-        }
-    }
-
-    public void addCluster(ClusterDTO cluster) {
-        try {
-            pst = con.prepareStatement("insert into cluster (CLUSTER_ID,NAME) values (?,?)");
-            pst.setLong(1,cluster.getCluster_id());
-            pst.setString(2,cluster.getName());
-            pst.executeUpdate();
-        } catch (SQLException e) {
-            Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot add cluster!");
         }
     }
 }
