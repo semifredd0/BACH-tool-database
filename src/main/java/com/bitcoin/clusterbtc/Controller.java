@@ -125,6 +125,10 @@ public class Controller {
                 }
             }
 
+            // Create graph if coinbase heuristic is matched
+            if(minerAddressList.size() > 1 && minerAddressList.size() < 10)
+                service.createGraph(minerAddressList, (short)0);
+
             // Add each transaction of the block to DB
             for(int j=1; j<list_tx.size(); j++) {
                 // Logging current transaction
@@ -244,6 +248,10 @@ public class Controller {
             last_address = inputAddressList.get(k);
         }
 
+        // Create graph if multi-input heuristic is matched
+        if(inputAddressList.size() > 1)
+            service.createGraph(inputAddressList, (short)1);
+
         // List of effective addresses
         List<String> outputAddressList = new ArrayList<>();
         for(int k=0; k<transaction.getVout_sz(); k++) {
@@ -341,6 +349,13 @@ public class Controller {
 
         // Add change address and its cluster to the multi-input cluster
         if(change_hash != null) {
+            // Add to the multi-input graph
+            if(inputAddressList.size() > 1)
+                service.addChangeToGraph(inputAddressList,change_hash);
+
+            // for(String hash: inputAddressList) System.out.println(hash);
+            // System.out.println("Change: " + change_hash + "\n");
+
             // Get cluster of the change address
             AddressDTO change_address = new AddressDTO();
             change_address.setAddress_hash(change_hash);

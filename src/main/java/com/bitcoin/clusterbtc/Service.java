@@ -11,7 +11,6 @@ import java.util.logging.Logger;
 public class Service {
     private static Connection con;
     private static PreparedStatement pst;
-    private static Long address_count = 0L;
 
     public Service() {}
 
@@ -30,7 +29,6 @@ public class Service {
             pst.setString(1,address.getAddress_hash());
             ResultSet rs = pst.executeQuery();
             rs.next();
-            address.setAddress_id(rs.getLong("ADDRESS_ID"));
             address.setAddress_hash(rs.getString("ADDRESS_HASH"));
             address.setMiner_address(rs.getBoolean("MINER_ADDRESS"));
             address.setCluster_id(rs.getLong("CLUSTER"));
@@ -87,22 +85,53 @@ public class Service {
     public void addAddress(AddressDTO address) {
         // ADDRESS_HASH has a unique constraint
         try {
-            pst = con.prepareStatement("insert into address (ADDRESS_ID,ADDRESS_HASH,MINER_ADDRESS,ADDRESS_TYPE,CLUSTER) values (?,?,?,?,?)");
-            pst.setLong(1,address_count);
-            pst.setString(2,address.getAddress_hash());
-            pst.setBoolean(3,address.isMiner_address());
-
+            pst = con.prepareStatement("insert into address (ADDRESS_HASH,MINER_ADDRESS,ADDRESS_TYPE,CLUSTER) values (?,?,?,?)");
+            pst.setString(1,address.getAddress_hash());
+            pst.setBoolean(2,address.isMiner_address());
             short type = getType(address.getAddress_hash());
-            if(type != -1) pst.setShort(4,type);
-            else pst.setNull(4,Types.SMALLINT);
-
-            if(address.getCluster_id() != null) pst.setLong(5,address.getCluster_id());
-            else pst.setNull(5,Types.BIGINT);
-
+            if(type != -1) pst.setShort(3,type);
+            else pst.setNull(3,Types.SMALLINT);
+            if(address.getCluster_id() != null) pst.setLong(4,address.getCluster_id());
+            else pst.setNull(4,Types.BIGINT);
             pst.executeUpdate();
-            address_count++;
         } catch (SQLException e) {
             // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Address already exists!");
+        }
+    }
+
+    public void createGraph(List<String> addressList, short type) {
+        for (int i=0; i<addressList.size()-1; i++) {
+            String address1 = addressList.get(i);
+            for(int j=i+1; j<addressList.size(); j++) {
+                String address2 = addressList.get(j);
+                // Do not consider the same address
+                if(address1.equals(address2))   continue;
+                try {
+                    pst = con.prepareStatement("insert into graph (ADDRESS_HASH1,ADDRESS_HASH2,TYPE) values (?,?,?)");
+                    pst.setString(1, address1);
+                    pst.setString(2, address2);
+                    pst.setShort(3, type);
+                    pst.executeUpdate();
+                } catch (SQLException e) {
+                    // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot create graph!");
+                }
+            }
+        }
+    }
+
+    public void addChangeToGraph(List<String> inputAddressList, String change_hash) {
+        for(int j=0; j<inputAddressList.size(); j++) {
+            // Do not consider the same address
+            if(inputAddressList.get(j).equals(change_hash))   continue;
+            try {
+                pst = con.prepareStatement("insert into graph (ADDRESS_HASH1,ADDRESS_HASH2,TYPE) values (?,?,?)");
+                pst.setString(1, inputAddressList.get(j));
+                pst.setString(2, change_hash);
+                pst.setShort(3, (short)2); // Change address type
+                pst.executeUpdate();
+            } catch (SQLException e) {
+                // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot add change address to graph!");
+            }
         }
     }
 
