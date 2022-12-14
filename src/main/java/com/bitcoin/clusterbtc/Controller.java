@@ -26,7 +26,7 @@ public class Controller {
 
     public Controller() {}
 
-    public void addTransaction() throws IOException {
+    public void parseBlocks() throws IOException {
         ArrayList<String> blockHashList = getHashesFromFile();
 
         // Open connection to DB
@@ -64,20 +64,26 @@ public class Controller {
                     minerAddressList.add(coinbase.getOut().get(k).getAddr());
             }
 
+            /* If coinbase has too many output, it could be that
+             * a mining pool is distributing the shares directly
+             * from the coinbase transaction to the pool members.
+             * So do not consider outputs as the same entity.
+             * We do not consider coinbase with more than 10 outs.
+             * Example: P2Pool and Eligius.
+             */
             ClusterDTO clusterDTO = new ClusterDTO();
-            for(int k=0; k<minerAddressList.size(); k++) {
+            for (int k = 0; k < minerAddressList.size(); k++) {
                 // Create addressDTO
                 AddressDTO minerAddress = new AddressDTO();
                 minerAddress.setMiner_address(true);
-                minerAddress.setMiningPoolAddress(false);
                 minerAddress.setAddress_hash(minerAddressList.get(k));
 
-                // Only one miner -> No cluster
-                if(minerAddressList.size() == 1)
+                // Only one miner or mining pool distribution -> No cluster
+                if (minerAddressList.size() == 1  || minerAddressList.size() >= 10)
                     service.addAddress(minerAddress);
-                // Coinbase cluster
-                else if(k == 0) { // First iteration -> Choose the cluster id
-                    if(service.getAddress(minerAddress) == null) {
+                    // Coinbase cluster
+                else if (k == 0) { // First iteration -> Choose the cluster id
+                    if (service.getAddress(minerAddress) == null) {
                         // New address -> Create new cluster and assign miner address to it
                         clusterDTO.setCluster_id(cluster_id_counter);
                         minerAddress.setCluster_id(cluster_id_counter);
@@ -87,7 +93,7 @@ public class Controller {
                     } else {
                         // Update the actual object with the existing one by address hash
                         minerAddress = service.getAddress(minerAddress);
-                        if(minerAddress.getCluster_id() != null)
+                        if (minerAddress.getCluster_id() != null)
                             // Address already exists with a cluster -> Update coinbase cluster ID
                             clusterDTO.setCluster_id(minerAddress.getCluster_id());
                         else {
@@ -100,7 +106,7 @@ public class Controller {
                         }
                     }
                 } else { // Next iterations -> Assign the same cluster ID
-                    if(service.getAddress(minerAddress) == null) {
+                    if (service.getAddress(minerAddress) == null) {
                         // New address -> Assign miner address to the coinbase cluster
                         minerAddress.setCluster_id(clusterDTO.getCluster_id());
                         // Save address
@@ -108,12 +114,13 @@ public class Controller {
                     } else {
                         // Update the actual object with the existing one by address hash
                         minerAddress = service.getAddress(minerAddress);
-                        if(minerAddress.getCluster_id() != null) {
+                        if (minerAddress.getCluster_id() != null) {
                             // Assign all addresses of the miner cluster to the new coinbase cluster
                             service.updateAddressList(clusterDTO.getCluster_id(), minerAddress.getCluster_id());
                         }
                         // Miner address exists without a cluster -> Assign the coinbase cluster
-                        else service.updateAddressCluster(clusterDTO.getCluster_id(), minerAddress.getAddress_hash());
+                        else
+                            service.updateAddressCluster(clusterDTO.getCluster_id(), minerAddress.getAddress_hash());
                     }
                 }
             }
@@ -185,7 +192,6 @@ public class Controller {
             // Create addressDTO
             AddressDTO tempAddressDTO = new AddressDTO();
             tempAddressDTO.setMiner_address(false);
-            tempAddressDTO.setMiningPoolAddress(false);
             tempAddressDTO.setAddress_hash(inputAddressList.get(k));
 
             // Only one input -> No cluster
@@ -245,36 +251,10 @@ public class Controller {
                 outputAddressList.add(transaction.getOut().get(k).getAddr());
         }
 
-        // Flag for mining pool transaction
-        boolean mining_pool_tx = false;
-        // Cluster for mining pool tx
-        ClusterDTO cluster_mining_pool = new ClusterDTO();
-        // Mining pool cluster
-        if(transaction.getVout_sz() >= 100) {
-            // Check if the output contains a miner address
-            for (String s : outputAddressList) {
-                AddressDTO tempAddress = new AddressDTO();
-                tempAddress.setAddress_hash(s);
-                tempAddress = service.getAddress(tempAddress);
-                if ((tempAddress != null) &&
-                        (tempAddress.isMiner_address() || tempAddress.isMiningPoolAddress())) {
-                    // Logging tx if it is a miner pool tx
-                    LOGGER.log(Level.INFO, "Mining pool tx: " + transaction.getHash());
-                    // Create a mining pool cluster
-                    cluster_mining_pool.setCluster_id(cluster_id_counter);
-                    // Update cluster ID
-                    cluster_id_counter++;
-                    // Activate flag
-                    mining_pool_tx = true;
-                    break;
-                }
-            }
-        }
-
         // Hash of the change address
         String change_hash = null;
         // Identify change address
-        if(!mining_pool_tx && transaction.getVout_sz() >= 2) {
+        if(transaction.getVout_sz() >= 2) {
             // ----------- First method
             // Get all addresses in the multi-input cluster
             List<String> hash_list;
@@ -354,25 +334,9 @@ public class Controller {
             // Create addressDTO
             AddressDTO tempAddressDTO = new AddressDTO();
             tempAddressDTO.setMiner_address(false);
-            tempAddressDTO.setMiningPoolAddress(false);
             tempAddressDTO.setAddress_hash(output);
-
-            // Check if it is a mining pool tx
-            if (mining_pool_tx) {
-                if (service.getAddress(tempAddressDTO) == null) { // Address not exists
-                    tempAddressDTO.setCluster_id(cluster_mining_pool.getCluster_id());
-                    tempAddressDTO.setMiningPoolAddress(true);
-                    service.addAddress(tempAddressDTO);
-                } else {
-                    // Update the actual object with the existing one (to get the cluster ID)
-                    tempAddressDTO = service.getAddress(tempAddressDTO);
-                    tempAddressDTO.setMiningPoolAddress(true);
-                    // Unify clusters: for each address in the old cluster -> Set the new cluster ID
-                    service.updateAddressList(cluster_mining_pool.getCluster_id(), tempAddressDTO.getCluster_id());
-                    // Set all address of the old cluster as mining pool addresses
-                    service.updateClusterMiningPool(cluster_mining_pool.getCluster_id(), true);
-                }
-            } else service.addAddress(tempAddressDTO); // Add address without cluster
+            // Add address without cluster
+            service.addAddress(tempAddressDTO);
         }
 
         // Add change address and its cluster to the multi-input cluster
@@ -400,17 +364,6 @@ public class Controller {
                     service.updateAddressCluster(miniCluster.getCluster_id(), inputAddressList.get(0));
                 }
             }
-        }
-
-        if(mining_pool_tx) {
-            if (multi_input_cluster.getCluster_id() != null)
-                // Unify multi-input cluster and mining-pool cluster
-                service.updateAddressList(cluster_mining_pool.getCluster_id(), multi_input_cluster.getCluster_id());
-            else if(inputAddressList.size() == 1)
-                // Add the only input address to the mining-pool cluster
-                service.updateAddressCluster(cluster_mining_pool.getCluster_id(), inputAddressList.get(0));
-            // Set all the new addresses in the cluster as mining pool addresses
-            service.updateClusterMiningPool(cluster_mining_pool.getCluster_id(), true);
         }
     }
 }

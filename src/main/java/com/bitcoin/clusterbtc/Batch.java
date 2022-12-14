@@ -7,7 +7,7 @@ public class Batch {
     public static void main(String[] args) {
         Controller controller = new Controller();
         try {
-            controller.addTransaction();
+            controller.parseBlocks();
         } catch (IOException e) {
             e.printStackTrace();
         }

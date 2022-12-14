@@ -33,7 +33,6 @@ public class Service {
             address.setAddress_id(rs.getLong("ADDRESS_ID"));
             address.setAddress_hash(rs.getString("ADDRESS_HASH"));
             address.setMiner_address(rs.getBoolean("MINER_ADDRESS"));
-            address.setMiningPoolAddress(rs.getBoolean("MINING_POOL_ADDRESS"));
             address.setCluster_id(rs.getLong("CLUSTER"));
             return address;
         } catch (SQLException ex) {
@@ -85,32 +84,20 @@ public class Service {
         }
     }
 
-    public void updateClusterMiningPool(Long clusterID, boolean mining_pool) {
-        try {
-            pst = con.prepareStatement("update ADDRESS set MINING_POOL_ADDRESS = ? where CLUSTER = ?");
-            pst.setBoolean(1, mining_pool);
-            pst.setLong(2, clusterID);
-            pst.executeUpdate();
-        } catch (SQLException ex) {
-            Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot update mining_pool columns in address!");
-        }
-    }
-
     public void addAddress(AddressDTO address) {
         // ADDRESS_HASH has a unique constraint
         try {
-            pst = con.prepareStatement("insert into address (ADDRESS_ID,ADDRESS_HASH,MINER_ADDRESS,MINING_POOL_ADDRESS,ADDRESS_TYPE,CLUSTER) values (?,?,?,?,?,?)");
+            pst = con.prepareStatement("insert into address (ADDRESS_ID,ADDRESS_HASH,MINER_ADDRESS,ADDRESS_TYPE,CLUSTER) values (?,?,?,?,?)");
             pst.setLong(1,address_count);
             pst.setString(2,address.getAddress_hash());
             pst.setBoolean(3,address.isMiner_address());
-            pst.setBoolean(4,address.isMiningPoolAddress());
 
             short type = getType(address.getAddress_hash());
-            if(type != -1) pst.setShort(5,type);
-            else pst.setNull(5,Types.SMALLINT);
+            if(type != -1) pst.setShort(4,type);
+            else pst.setNull(4,Types.SMALLINT);
 
-            if(address.getCluster_id() != null) pst.setLong(6,address.getCluster_id());
-            else pst.setNull(6,Types.BIGINT);
+            if(address.getCluster_id() != null) pst.setLong(5,address.getCluster_id());
+            else pst.setNull(5,Types.BIGINT);
 
             pst.executeUpdate();
             address_count++;

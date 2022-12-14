@@ -5,7 +5,6 @@ public class AddressDTO {
     private Long address_id;
     private String addressHash;
     private boolean minerAddress;
-    private boolean miningPoolAddress;
     private short addressType;
     private Long clusterId;
 
@@ -41,14 +40,6 @@ public class AddressDTO {
 
     public void setMiner_address(boolean miner_address) {
         this.minerAddress = miner_address;
-    }
-
-    public boolean isMiningPoolAddress() {
-        return miningPoolAddress;
-    }
-
-    public void setMiningPoolAddress(boolean miningPoolAddress) {
-        this.miningPoolAddress = miningPoolAddress;
     }
 
     public short getAddressType() {

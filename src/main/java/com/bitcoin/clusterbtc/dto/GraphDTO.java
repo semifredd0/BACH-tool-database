@@ -8,7 +8,6 @@ public class GraphDTO {
      * 0 -> Coinbase clustering
      * 1 -> Multi-input clustering
      * 2 -> Change address clustering
-     * 3 -> Mining pool clustering
      */
     private int type;
 
