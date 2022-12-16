@@ -2,10 +2,19 @@ package com.bitcoin.clusterbtc.dto;
 
 public class AddressDTO {
 
+    private Long addressId;
     private String addressHash;
     private boolean minerAddress;
     private short addressType;
     private Long clusterId;
+
+    public Long getAddressId() {
+        return addressId;
+    }
+
+    public void setAddressId(Long addressId) {
+        this.addressId = addressId;
+    }
 
     public String getAddress_hash() {
         return addressHash;
