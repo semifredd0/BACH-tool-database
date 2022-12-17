@@ -23,6 +23,23 @@ public class Service {
         con.close();
     }
 
+    public void addAddress(AddressDTO address) {
+        // ADDRESS_HASH has a unique constraint
+        try {
+            pst = con.prepareStatement("insert into address (ADDRESS_HASH,MINER_ADDRESS,ADDRESS_TYPE,CLUSTER_ID) values (?,?,?,?)");
+            pst.setString(1,address.getAddress_hash());
+            pst.setBoolean(2,address.isMiner_address());
+            short type = getType(address.getAddress_hash());
+            if(type != -1) pst.setShort(3,type);
+            else pst.setNull(3,Types.SMALLINT);
+            if(address.getCluster_id() != null) pst.setLong(4,address.getCluster_id());
+            else pst.setNull(4,Types.BIGINT);
+            pst.executeUpdate();
+        } catch (SQLException e) {
+            // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Address already exists!");
+        }
+    }
+
     public AddressDTO getAddress(String hash) {
         try {
             pst = con.prepareStatement("select * from ADDRESS where ADDRESS_HASH = ?");
@@ -57,23 +74,6 @@ public class Service {
         }
     }
 
-    /**
-     * Gli address del vecchio cluster faranno parte del nuovo cluster.
-     * Il vecchio cluster sarà vuoto.
-     * @param newClusterID
-     * @param oldClusterID
-     */
-    public void updateAddressList(Long newClusterID, Long oldClusterID) {
-        try {
-            pst = con.prepareStatement("update ADDRESS set CLUSTER_ID = ? where CLUSTER_ID = ?");
-            pst.setLong(1, newClusterID);
-            pst.setLong(2, oldClusterID);
-            pst.executeUpdate();
-        } catch (SQLException ex) {
-            Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot update cluster column in address!");
-        }
-    }
-
     public void updateAddressCluster(Long clusterID, String addressHash) {
         try {
             pst = con.prepareStatement("update ADDRESS set CLUSTER_ID = ? where ADDRESS_HASH = ?");
@@ -85,20 +85,18 @@ public class Service {
         }
     }
 
-    public void addAddress(AddressDTO address) {
-        // ADDRESS_HASH has a unique constraint
+    /** Gli address del vecchio cluster faranno parte del nuovo cluster.
+     * Il vecchio cluster sarà vuoto.
+     * @param newClusterID
+     * @param oldClusterID */
+    public void updateAddressList(Long newClusterID, Long oldClusterID) {
         try {
-            pst = con.prepareStatement("insert into address (ADDRESS_HASH,MINER_ADDRESS,ADDRESS_TYPE,CLUSTER_ID) values (?,?,?,?)");
-            pst.setString(1,address.getAddress_hash());
-            pst.setBoolean(2,address.isMiner_address());
-            short type = getType(address.getAddress_hash());
-            if(type != -1) pst.setShort(3,type);
-            else pst.setNull(3,Types.SMALLINT);
-            if(address.getCluster_id() != null) pst.setLong(4,address.getCluster_id());
-            else pst.setNull(4,Types.BIGINT);
+            pst = con.prepareStatement("update ADDRESS set CLUSTER_ID = ? where CLUSTER_ID = ?");
+            pst.setLong(1, newClusterID);
+            pst.setLong(2, oldClusterID);
             pst.executeUpdate();
-        } catch (SQLException e) {
-            // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Address already exists!");
+        } catch (SQLException ex) {
+            Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot update cluster column in address!");
         }
     }
 
@@ -112,31 +110,44 @@ public class Service {
                 pst.setShort(3, type);
                 pst.executeUpdate();
             } catch (SQLException e) {
+                // Chiave duplicata
                 // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Address + SubCluster already exists!");
             }
         }
     }
 
-    public void addChangeToSubCluster(Long subClusterId, String change_hash) {
+    public void addAddressSubCluster(Long subClusterId, String change_hash, short type) {
         Long addressId = getAddress(change_hash).getAddressId();
         try {
             pst = con.prepareStatement("insert into SUB_CLUSTER (SUB_CLUSTER_ID,ADDRESS_ID,NODE_TYPE) values (?,?,?)");
             pst.setLong(1, subClusterId);
             pst.setLong(2, addressId);
-            pst.setShort(3, (short)2);
+            pst.setShort(3, type);
             pst.executeUpdate();
         } catch (SQLException e) {
-            // Collisione: address già inserito nel subCluster, chiamare updateSubClusterType() se oldType > newType.
+            // Chiave duplicata
             // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Address + SubCluster already exists!");
         }
     }
 
-    /**
-     * Scala affidabilità delle euristiche: 0,1,2 (ordine crescente).
+    public long getSubClusterId(Long addressId) {
+        try {
+            pst = con.prepareStatement("select SUB_CLUSTER_ID from SUB_CLUSTER where ADDRESS_ID = ?");
+            pst.setLong(1,addressId);
+            ResultSet rs = pst.executeQuery();
+            rs.next();
+            return rs.getLong("SUB_CLUSTER_ID");
+        } catch (SQLException ex) {
+            // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot find address ID!");
+            return -1; // Address do not have a cluster
+        }
+    }
+
+    /** Scala affidabilità delle euristiche: 0,1,2 (ordine crescente).
      * Quindi se ci sono dei duplicati di address nello stesso subCluster,
      * impostiamo come node_type il numero corrispondente alla euristica
      * con affidabilità maggiore, ossia il type minore.
-     */
+     * Metodo non utilizzato attualmente. */
     private void updateSubClusterType(Long addressId, Long subClusterId, short type) {
         try {
             pst = con.prepareStatement("update SUB_CLUSTER set NODE_TYPE = ? where ADDRESS_ID = ?, SUB_CLUSTER_ID = ?");

@@ -22,8 +22,8 @@ public class Controller {
 
     private final static Logger LOGGER = Logger.getLogger(Logger.GLOBAL_LOGGER_NAME);
     private final Service service = new Service();
-    private static Long cluster_id_counter = 0L; // ClusterID counter
-    private static Long subClusterIdCounter = 0L; // SubClusterID counter
+    private static Long cluster_id_counter = 1L; // ClusterID counter
+    private static Long subClusterIdCounter = 1L; // SubClusterID counter
 
     public Controller() {}
 
@@ -59,11 +59,13 @@ public class Controller {
             Tx coinbase = list_tx.get(0);
 
             // List of effective addresses
-            List<String> minerAddressList = new ArrayList<>();
+            List<String> minerAddressListDuplicates = new ArrayList<>();
             for(int k=0; k<coinbase.getVout_sz(); k++) {
                 if (coinbase.getOut().get(k).getAddr() != null)
-                    minerAddressList.add(coinbase.getOut().get(k).getAddr());
+                    minerAddressListDuplicates.add(coinbase.getOut().get(k).getAddr());
             }
+            // Create a list without duplicates
+            List<String> minerAddressList = new ArrayList<>(new HashSet<>(minerAddressListDuplicates));
 
             /* If coinbase has too many output, it could be that
              * a mining pool is distributing the shares directly
@@ -182,8 +184,6 @@ public class Controller {
 
     private void createAddressTransactionDTO(Tx transaction) {
         ClusterDTO multi_input_cluster = new ClusterDTO();
-        // Save last input address to check if the next is the same
-        String last_address = null;
 
         // List of effective addresses
         List<String> inputAddressListDuplicates = new ArrayList<>();
@@ -247,8 +247,6 @@ public class Controller {
                     else service.updateAddressCluster(multi_input_cluster.getCluster_id(), tempAddressDTO.getAddress_hash());
                 }
             }
-            // Save last address to check in the next iteration and skip if they are equals
-            last_address = inputAddressList.get(k);
         }
 
         // Create graph if multi-input heuristic is matched
@@ -355,26 +353,29 @@ public class Controller {
         }
 
         // Add change address and its cluster to the multi-input cluster
-        if(change_hash != null) {
-            boolean cluster_created = false;
-
-            for(String hash: inputAddressList) System.out.println(hash);
-            System.out.println("Change: " + change_hash + "\n");
-
+        // If input contains the change -> Skip clustering
+        if(change_hash != null && !inputAddressList.contains(change_hash)) {
+            // Get the multi-input sub-cluster ID
+            Long tempId = service.getAddress(inputAddressList.get(0)).getAddressId();
+            Long multi_input_sub_cluster_id = service.getSubClusterId(tempId);
+            assert multi_input_sub_cluster_id != -1; // Should be always true
             // Get cluster of the change address
             Long change_address_cluster = service.getAddress(change_hash).getCluster_id();
-            if(change_address_cluster != null && multi_input_cluster.getCluster_id() != null) {
+            // ClusterID could never be zero because counter starts from 1, so not exists
+            if (change_address_cluster != 0 && multi_input_cluster.getCluster_id() != null) {
                 // Unify clusters: for each address in the change address cluster -> Set the multi-input cluster ID
                 service.updateAddressList(multi_input_cluster.getCluster_id(), change_address_cluster);
-                cluster_created = true;
-            }
-            else if (multi_input_cluster.getCluster_id() != null) {
+                // Add the change address to the multi-input sub-cluster
+                // Multi-input sub-cluster not null -> Multi-input sub-cluster exists
+                service.addAddressSubCluster(multi_input_sub_cluster_id, change_hash, (short) 2);
+            } else if (multi_input_cluster.getCluster_id() != null) {
                 // Change address cluster is null -> There is a multi-input cluster
                 // Add just the change address to the multi-input cluster
                 service.updateAddressCluster(multi_input_cluster.getCluster_id(), change_hash);
-                cluster_created = true;
-            }
-            else {
+                // Add the change address to the multi-input sub-cluster
+                // Multi-input sub-cluster not null -> Multi-input sub-cluster exists
+                service.addAddressSubCluster(multi_input_sub_cluster_id, change_hash, (short) 2);
+            } else {
                 // The two clusters are null -> One input and a change address -> Create cluster
                 // Verify input exists
                 if (inputAddressList.size() == 1) {
@@ -384,13 +385,13 @@ public class Controller {
                     cluster_id_counter++;
                     service.updateAddressCluster(miniCluster.getCluster_id(), change_hash);
                     service.updateAddressCluster(miniCluster.getCluster_id(), inputAddressList.get(0));
-                    cluster_created = true;
+                    // Create a sub-cluster for the two address
+                    service.addAddressSubCluster(subClusterIdCounter, change_hash, (short) 2);
+                    service.addAddressSubCluster(subClusterIdCounter, inputAddressList.get(0), (short) 1);
+                    // Update ID counter
+                    subClusterIdCounter++;
                 }
             }
-
-            // Add change to the multi-input graph
-            if(cluster_created)
-                service.addChangeToSubCluster(subClusterIdCounter-1,change_hash);
         }
     }
 }
