@@ -3,15 +3,11 @@ package com.bitcoin.clusterbtc;
 import com.bitcoin.clusterbtc.model.Block;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Scanner;
 
 public class Batch {
 
@@ -23,7 +19,7 @@ public class Batch {
             service.openConnection();
             // Get block hash -> Download block -> Parse block
             ArrayList<String> blockHashList = getHashesFromFile();
-            for (int i=500008; i<500010; i++) {
+            for (int i=0; i<10000; i++) {
                 Block block = downloadBlock(blockHashList.get(i));
                 controller.parseBlocks(block,i);
             }
@@ -39,14 +35,12 @@ public class Batch {
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
         conn.connect();
-        // Write all the JSON data into a string using a scanner
-        StringBuilder inline = new StringBuilder();
-        Scanner scanner = new Scanner(url.openStream());
-        while (scanner.hasNext())
-            inline.append(scanner.nextLine());
-        scanner.close();
-        String block_str = String.valueOf(inline);
-        return new ObjectMapper().readerFor(Block.class).readValue(block_str);
+        // Write all the JSON data into a string using a BufferedReader
+        String readLine;
+        StringBuilder block = new StringBuilder();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
+        while((readLine = reader.readLine()) != null) block.append(readLine);
+        return new ObjectMapper().readerFor(Block.class).readValue(String.valueOf(block));
     }
 
     private static ArrayList<String> getHashesFromFile() throws IOException {

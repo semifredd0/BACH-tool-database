@@ -102,11 +102,11 @@ public class Service {
     }
 
     public void addSubCluster(List<String> addressList, short type, long subClusterId) {
-        /* List<Long> addressIds = new ArrayList<>();
+        List<Long> addressIds = new ArrayList<>();
         for(String hash : addressList)
             addressIds.add(getAddress(hash).getAddressId());
         // Check for duplicates sub-clusters
-        if(!addSubClusterCheck(addressIds)) return; */
+        if(!addSubClusterCheck(addressIds)) return;
         for(String hash : addressList) {
             Long addressId = getAddress(hash).getAddressId();
             try {

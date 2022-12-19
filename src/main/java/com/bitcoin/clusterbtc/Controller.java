@@ -26,20 +26,20 @@ public class Controller {
     }
 
     public void parseBlocks(Block block, int i) throws IOException {
-        // Timeout DB connection for backup every 100 blocks
-        /* if (i % 10000 == 0) {
+        // Timeout DB connection for backup every 1000 blocks
+        if (i % 1000 == 0) {
             try {
                 service.closeConnection();
                 service.openConnection();
             } catch (SQLException | ClassNotFoundException e) {
                 LOGGER.log(Level.SEVERE, "Cannot restart connection to DB!");
             }
-        } */
+        }
 
         // Initialize block object
         List<Tx> list_tx = block.getTx();
         // Logging current block
-        LOGGER.log(Level.INFO, "Block height: " + i + " - Transaction number: " + block.getTx().size());
+        System.out.println("Block height: " + i + " - Transaction number: " + block.getTx().size());
 
         // Coinbase transaction added manually to DB
         // Coinbase transaction can have multiple output
@@ -128,7 +128,7 @@ public class Controller {
             createAddressTransactionDTO(list_tx.get(j));
         }
 
-        LOGGER.log(Level.INFO, "Block parsed!");
+        System.out.println("Block parsed successfully!");
     }
 
     private void createAddressTransactionDTO(Tx transaction) {
