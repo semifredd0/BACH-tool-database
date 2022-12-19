@@ -87,8 +87,9 @@ public class Service {
 
     /** Gli address del vecchio cluster faranno parte del nuovo cluster.
      * Il vecchio cluster sarà vuoto.
-     * @param newClusterID
-     * @param oldClusterID */
+     * @param newClusterID New cluster to add.
+     * @param oldClusterID Old cluster to substitute.
+     */
     public void updateAddressList(Long newClusterID, Long oldClusterID) {
         try {
             pst = con.prepareStatement("update ADDRESS set CLUSTER_ID = ? where CLUSTER_ID = ?");
@@ -101,6 +102,11 @@ public class Service {
     }
 
     public void addSubCluster(List<String> addressList, short type, long subClusterId) {
+        /* List<Long> addressIds = new ArrayList<>();
+        for(String hash : addressList)
+            addressIds.add(getAddress(hash).getAddressId());
+        // Check for duplicates sub-clusters
+        if(!addSubClusterCheck(addressIds)) return; */
         for(String hash : addressList) {
             Long addressId = getAddress(hash).getAddressId();
             try {
@@ -130,16 +136,56 @@ public class Service {
         }
     }
 
-    public long getSubClusterId(Long addressId) {
+    /** Check if the sub-cluster to add already exists,
+     * or if the sub-cluster to add is a partition of an existing cluster.
+     * @param subClusterToAdd List of addresses IDs in the sub-cluster.
+     */
+    private boolean addSubClusterCheck(List<Long> subClusterToAdd) {
+        for(Long addressId : subClusterToAdd) {
+            List<Long> subClusters = getSubClusterIdFromAddressId(addressId);
+            if(subClusters == null) continue; // Address does not have a cluster
+            for(Long subClusterId : subClusters) {
+                boolean inner_cluster = true;
+                List<Long> subClusterAddresses = getSubClusterAddresses(subClusterId);
+                assert subClusterAddresses != null; // Should be always true
+                for(Long item : subClusterToAdd) {
+                    if(!subClusterAddresses.contains(item)) {
+                        inner_cluster = false;
+                        break;
+                    }
+                }
+                if(inner_cluster) return false; // Inner cluster found
+            }
+        }
+        return true;
+    }
+
+    private List<Long> getSubClusterAddresses(Long subClusterId) {
+        try {
+            pst = con.prepareStatement("select ADDRESS_ID from SUB_CLUSTER where SUB_CLUSTER_ID = ?");
+            pst.setLong(1,subClusterId);
+            ResultSet rs = pst.executeQuery();
+            List<Long> lista = new ArrayList<>();
+            while(rs.next())
+                lista.add(rs.getLong("ADDRESS_ID"));
+            return lista;
+        } catch (SQLException ex) {
+            return null;
+        }
+    }
+
+    private List<Long> getSubClusterIdFromAddressId(Long addressId) {
         try {
             pst = con.prepareStatement("select SUB_CLUSTER_ID from SUB_CLUSTER where ADDRESS_ID = ?");
             pst.setLong(1,addressId);
             ResultSet rs = pst.executeQuery();
-            rs.next();
-            return rs.getLong("SUB_CLUSTER_ID");
+            List<Long> lista = new ArrayList<>();
+            while(rs.next())
+                lista.add(rs.getLong("SUB_CLUSTER_ID"));
+            return lista;
         } catch (SQLException ex) {
             // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot find address ID!");
-            return -1; // Address do not have a cluster
+            return null; // Address do not have a cluster
         }
     }
 
