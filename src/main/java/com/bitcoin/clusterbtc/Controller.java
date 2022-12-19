@@ -83,10 +83,12 @@ public class Controller {
                 } else {
                     // Update the actual object with the existing one by address hash
                     minerAddress = service.getAddress(minerAddress.getAddress_hash());
-                    if (minerAddress.getCluster_id() != null)
+                    if (minerAddress.getCluster_id() != 0) {
                         // Address already exists with a cluster -> Update coinbase cluster ID
                         clusterDTO.setCluster_id(minerAddress.getCluster_id());
-                    else {
+                        // Update other addresses in the miner cluster as miners (NO)
+                        // service.setMiners(service.getAddressByCluster(clusterDTO.getCluster_id()));
+                    } else {
                         // Address exists without a cluster -> Create new cluster and assign miner address to it
                         clusterDTO.setCluster_id(cluster_id_counter);
                         minerAddress.setCluster_id(cluster_id_counter);
@@ -104,9 +106,11 @@ public class Controller {
                 } else {
                     // Update the actual object with the existing one by address hash
                     minerAddress = service.getAddress(minerAddress.getAddress_hash());
-                    if (minerAddress.getCluster_id() != null) {
+                    if (minerAddress.getCluster_id() != 0) {
                         // Assign all addresses of the miner cluster to the new coinbase cluster
                         service.updateAddressList(clusterDTO.getCluster_id(), minerAddress.getCluster_id());
+                        // Update other addresses in the miner cluster as miners (NO)
+                        // service.setMiners(service.getAddressByCluster(clusterDTO.getCluster_id()));
                     }
                     // Miner address exists without a cluster -> Assign the coinbase cluster
                     else
@@ -127,7 +131,6 @@ public class Controller {
             // LOGGER.log(Level.INFO, "Transaction number: " + j);
             createAddressTransactionDTO(list_tx.get(j));
         }
-
         System.out.println("Block parsed successfully!");
     }
 
@@ -167,7 +170,7 @@ public class Controller {
                 } else {
                     // Update the actual object with the existing one by address hash
                     tempAddressDTO = service.getAddress(tempAddressDTO.getAddress_hash());
-                    if(tempAddressDTO.getCluster_id() != null) {
+                    if(tempAddressDTO.getCluster_id() != 0) {
                         // Address already exists with a cluster -> Update cluster ID
                         multi_input_cluster.setCluster_id(tempAddressDTO.getCluster_id());
                     } else {
@@ -188,7 +191,7 @@ public class Controller {
                 } else {
                     // Update the actual object with the existing one by address hash
                     tempAddressDTO = service.getAddress(tempAddressDTO.getAddress_hash());
-                    if(tempAddressDTO.getCluster_id() != null) {
+                    if(tempAddressDTO.getCluster_id() != 0) {
                         // Assign all addresses of the multi-input cluster to the existing cluster
                         service.updateAddressList(tempAddressDTO.getCluster_id(), multi_input_cluster.getCluster_id());
                         // Update the multi-input cluster ID

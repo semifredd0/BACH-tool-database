@@ -101,6 +101,19 @@ public class Service {
         }
     }
 
+    public void setMiners(List<String> addressList) {
+        try {
+            for(String hash : addressList) {
+                pst = con.prepareStatement("update ADDRESS set MINER_ADDRESS = ? where ADDRESS_HASH = ?");
+                pst.setBoolean(1, true);
+                pst.setString(2, hash);
+                pst.executeUpdate();
+            }
+        } catch (SQLException ex) {
+            Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot update miner column in address!");
+        }
+    }
+
     public void addSubCluster(List<String> addressList, short type, long subClusterId) {
         List<Long> addressIds = new ArrayList<>();
         for(String hash : addressList)
