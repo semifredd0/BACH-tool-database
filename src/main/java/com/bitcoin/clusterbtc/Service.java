@@ -101,121 +101,87 @@ public class Service {
         }
     }
 
-    public void setMiners(List<String> addressList) {
+    /** Gli address del vecchio cluster faranno parte del nuovo cluster.
+     * Il vecchio cluster sarà vuoto.
+     * @param newClusterID New cluster to add.
+     * @param oldClusterID Old cluster to substitute.
+     */
+    public void updateSubClusterList(Long newClusterID, Long oldClusterID) {
         try {
-            for(String hash : addressList) {
-                pst = con.prepareStatement("update ADDRESS set MINER_ADDRESS = ? where ADDRESS_HASH = ?");
-                pst.setBoolean(1, true);
-                pst.setString(2, hash);
-                pst.executeUpdate();
-            }
+            pst = con.prepareStatement("update SUB_CLUSTER set CLUSTER_ID = ? where CLUSTER_ID = ?");
+            pst.setLong(1, newClusterID);
+            pst.setLong(2, oldClusterID);
+            pst.executeUpdate();
         } catch (SQLException ex) {
-            Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot update miner column in address!");
+            Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot update cluster column in sub_cluster!");
         }
     }
 
-    public void addSubCluster(List<String> addressList, short type, long subClusterId) {
-        List<Long> addressIds = new ArrayList<>();
-        for(String hash : addressList)
-            addressIds.add(getAddress(hash).getAddressId());
-        // Check for duplicates sub-clusters
-        if(!addSubClusterCheck(addressIds)) return;
-        for(String hash : addressList) {
-            Long addressId = getAddress(hash).getAddressId();
-            try {
-                pst = con.prepareStatement("insert into SUB_CLUSTER (SUB_CLUSTER_ID,ADDRESS_ID,NODE_TYPE) values (?,?,?)");
-                pst.setLong(1, subClusterId);
-                pst.setLong(2, addressId);
-                pst.setShort(3, type);
-                pst.executeUpdate();
-            } catch (SQLException e) {
-                // Chiave duplicata
-                // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Address + SubCluster already exists!");
+    public void addSubCluster(List<String> addressList, short type) {
+        Long clusterId = getClusterId(addressList.get(0));
+        for(int i=0; i<addressList.size()-1; i++) {
+            for (int j=i+1; j<addressList.size(); j++) {
+                Long addressId1 = getAddress(addressList.get(i)).getAddressId();
+                Long addressId2 = getAddress(addressList.get(j)).getAddressId();
+                try {
+                    pst = con.prepareStatement("insert into SUB_CLUSTER (ADDRESS_ID_1,ADDRESS_ID_2,CLUSTER_ID,LINK_TYPE) values (?,?,?,?)");
+                    pst.setLong(1, addressId1);
+                    pst.setLong(2, addressId2);
+                    pst.setLong(3, clusterId);
+                    pst.setShort(4, type);
+                    pst.executeUpdate();
+                } catch (SQLException e) {
+                    // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Link already exists!");
+                }
             }
         }
     }
 
-    public void addAddressSubCluster(Long subClusterId, String change_hash, short type) {
-        Long addressId = getAddress(change_hash).getAddressId();
+    // First one is always the change address
+    public void addSingleLinkSubCluster(String change_hash, String input_hash, short type) {
+        Long clusterId = getClusterId(input_hash);
+        Long addressId1 = getAddress(change_hash).getAddressId();
+        Long addressId2 = getAddress(input_hash).getAddressId();
+        // Verify duplicated links
+        if(checkLink(addressId1,addressId2) != null) return;
+        if(checkLink(addressId2,addressId1) != null) return;
         try {
-            pst = con.prepareStatement("insert into SUB_CLUSTER (SUB_CLUSTER_ID,ADDRESS_ID,NODE_TYPE) values (?,?,?)");
-            pst.setLong(1, subClusterId);
-            pst.setLong(2, addressId);
-            pst.setShort(3, type);
+            pst = con.prepareStatement("insert into SUB_CLUSTER (ADDRESS_ID_1,ADDRESS_ID_2,CLUSTER_ID,LINK_TYPE) values (?,?,?,?)");
+            pst.setLong(1, addressId1);
+            pst.setLong(2, addressId2);
+            pst.setLong(3, clusterId);
+            pst.setShort(4, type);
             pst.executeUpdate();
         } catch (SQLException e) {
-            // Chiave duplicata
-            // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Address + SubCluster already exists!");
+            // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Link already exists!");
         }
     }
 
-    /** Check if the sub-cluster to add already exists,
-     * or if the sub-cluster to add is a partition of an existing cluster.
-     * @param subClusterToAdd List of addresses IDs in the sub-cluster.
-     */
-    private boolean addSubClusterCheck(List<Long> subClusterToAdd) {
-        for(Long addressId : subClusterToAdd) {
-            List<Long> subClusters = getSubClusterIdFromAddressId(addressId);
-            if(subClusters == null) continue; // Address does not have a cluster
-            for(Long subClusterId : subClusters) {
-                boolean inner_cluster = true;
-                List<Long> subClusterAddresses = getSubClusterAddresses(subClusterId);
-                assert subClusterAddresses != null; // Should be always true
-                for(Long item : subClusterToAdd) {
-                    if(!subClusterAddresses.contains(item)) {
-                        inner_cluster = false;
-                        break;
-                    }
-                }
-                if(inner_cluster) return false; // Inner cluster found
-            }
-        }
-        return true;
-    }
-
-    private List<Long> getSubClusterAddresses(Long subClusterId) {
+    // Return null if link doesn't exist, the addressId otherwise
+    private Long checkLink(Long id1, Long id2) {
         try {
-            pst = con.prepareStatement("select ADDRESS_ID from SUB_CLUSTER where SUB_CLUSTER_ID = ?");
-            pst.setLong(1,subClusterId);
+            pst = con.prepareStatement("select * from SUB_CLUSTER where ADDRESS_ID_1 = ? and ADDRESS_ID_2 = ?");
+            pst.setLong(1,id1);
+            pst.setLong(2,id2);
             ResultSet rs = pst.executeQuery();
-            List<Long> lista = new ArrayList<>();
-            while(rs.next())
-                lista.add(rs.getLong("ADDRESS_ID"));
-            return lista;
+            rs.next();
+            return rs.getLong("ADDRESS_ID_1");
         } catch (SQLException ex) {
+            // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot find link!");
             return null;
         }
     }
 
-    private List<Long> getSubClusterIdFromAddressId(Long addressId) {
+    private Long getClusterId(String hash) {
         try {
-            pst = con.prepareStatement("select SUB_CLUSTER_ID from SUB_CLUSTER where ADDRESS_ID = ?");
-            pst.setLong(1,addressId);
+            pst = con.prepareStatement("select CLUSTER_ID from ADDRESS where ADDRESS_HASH = ?");
+            pst.setString(1,hash);
             ResultSet rs = pst.executeQuery();
-            List<Long> lista = new ArrayList<>();
-            while(rs.next())
-                lista.add(rs.getLong("SUB_CLUSTER_ID"));
-            return lista;
+            rs.next();
+            return rs.getLong("CLUSTER_ID");
         } catch (SQLException ex) {
-            // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot find address ID!");
-            return null; // Address do not have a cluster
-        }
-    }
-
-    /** Scala affidabilità delle euristiche: 0,1,2 (ordine crescente).
-     * Quindi se ci sono dei duplicati di address nello stesso subCluster,
-     * impostiamo come node_type il numero corrispondente alla euristica
-     * con affidabilità maggiore, ossia il type minore.
-     * Metodo non utilizzato attualmente. */
-    private void updateSubClusterType(Long addressId, Long subClusterId, short type) {
-        try {
-            pst = con.prepareStatement("update SUB_CLUSTER set NODE_TYPE = ? where ADDRESS_ID = ?, SUB_CLUSTER_ID = ?");
-            pst.setShort(1, type);
-            pst.setLong(2, addressId);
-            pst.setLong(3, subClusterId);
-            pst.executeUpdate();
-        } catch (SQLException ex) {
-            Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot update node type in sub cluster!");
+            // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Cannot find address!");
+            return null;
         }
     }
 

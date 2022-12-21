@@ -19,7 +19,7 @@ public class Batch {
             service.openConnection();
             // Get block hash -> Download block -> Parse block
             ArrayList<String> blockHashList = getHashesFromFile();
-            for (int i=0; i<100000; i++) {
+            for (int i=100000; i<100500; i++) {
                 Block block = downloadBlock(blockHashList.get(i));
                 controller.parseBlocks(block,i);
             }
@@ -30,17 +30,23 @@ public class Batch {
         }
     }
 
-    private static Block downloadBlock(String hash) throws IOException {
-        URL url = new URL("https://blockchain.info/rawblock/" + hash);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("GET");
-        conn.connect();
-        // Write all the JSON data into a string using a BufferedReader
-        String readLine;
-        StringBuilder block = new StringBuilder();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
-        while((readLine = reader.readLine()) != null) block.append(readLine);
-        return new ObjectMapper().readerFor(Block.class).readValue(String.valueOf(block));
+    private static Block downloadBlock(String hash) {
+        try {
+            URL url = new URL("https://blockchain.info/rawblock/" + hash);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.connect();
+            // Write all the JSON data into a string using a BufferedReader
+            String readLine;
+            StringBuilder block = new StringBuilder();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
+            while ((readLine = reader.readLine()) != null) block.append(readLine);
+            return new ObjectMapper().readerFor(Block.class).readValue(String.valueOf(block));
+        } catch (IOException e) {
+            // If exception is caught -> Restart function
+            e.printStackTrace();
+            return downloadBlock(hash);
+        }
     }
 
     private static ArrayList<String> getHashesFromFile() throws IOException {
