@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Controller {
@@ -21,20 +20,11 @@ public class Controller {
     private final Service service = new Service();
     private static Long cluster_id_counter = 1L; // ClusterID counter
 
+
     public Controller() throws SQLException {
     }
 
     public void parseBlocks(Block block, int i) throws IOException {
-        // Timeout DB connection for backup every 1000 blocks
-        if (i % 1000 == 0) {
-            try {
-                service.closeConnection();
-                service.openConnection();
-            } catch (SQLException | ClassNotFoundException e) {
-                LOGGER.log(Level.SEVERE, "Cannot restart connection to DB!");
-            }
-        }
-
         // Initialize block object
         List<Tx> list_tx = block.getTx();
         // Logging current block
@@ -106,10 +96,12 @@ public class Controller {
                     // Update the actual object with the existing one by address hash
                     minerAddress = service.getAddress(minerAddress.getAddress_hash());
                     if (minerAddress.getCluster_id() != 0) {
-                        // Assign all addresses of the miner cluster to the new coinbase cluster
-                        service.updateAddressList(clusterDTO.getCluster_id(), minerAddress.getCluster_id());
+                        // Assign all addresses of the coinbase cluster to the miner cluster
+                        service.updateAddressList(minerAddress.getCluster_id(), clusterDTO.getCluster_id());
                         // Update clusterID in the graph table
-                        service.updateSubClusterList(clusterDTO.getCluster_id(), minerAddress.getCluster_id());
+                        service.updateSubClusterList(minerAddress.getCluster_id(), clusterDTO.getCluster_id());
+                        // Update coinbase cluster with the miner cluster
+                        clusterDTO.setCluster_id(minerAddress.getCluster_id());
                     }
                     // Miner address exists without a cluster -> Assign the coinbase cluster
                     else
@@ -128,7 +120,9 @@ public class Controller {
             // LOGGER.log(Level.INFO, "Transaction number: " + j);
             createAddressTransactionDTO(list_tx.get(j));
         }
-        System.out.println("Block parsed successfully!");
+        // To restart the batch, set clusterIdCounter to the last printed
+        // Note: verify no address belongs to that cluster
+        System.out.println("Block parsed successfully - ClusterID: " + cluster_id_counter);
     }
 
     private void createAddressTransactionDTO(Tx transaction) {
@@ -191,6 +185,8 @@ public class Controller {
                     if(tempAddressDTO.getCluster_id() != 0) {
                         // Assign all addresses of the multi-input cluster to the existing cluster
                         service.updateAddressList(tempAddressDTO.getCluster_id(), multi_input_cluster.getCluster_id());
+                        // Update clusterID in the graph table
+                        service.updateSubClusterList(tempAddressDTO.getCluster_id(), multi_input_cluster.getCluster_id());
                         // Update the multi-input cluster ID
                         multi_input_cluster.setCluster_id(tempAddressDTO.getCluster_id());
                     }
@@ -324,13 +320,18 @@ public class Controller {
                     service.addSingleLinkSubCluster(change_hash, hash, (short) 2);
             } else {
                 // One input and a change address -> Create cluster and sub-cluster
-                // Verify input address have a cluster, otherwise create a new one
+                // Verify if input and change address have a cluster, otherwise create a new one
                 Long input_cluster = service.getAddress(inputAddressList.get(0)).getCluster_id();
-                if(input_cluster != 0) {
-                    // Add the change to the input cluster
+                if(input_cluster != 0 && change_address_cluster != 0) {
+                    // Unify clusters: for each address in the change address cluster -> Set the input cluster ID
+                    service.updateAddressList(input_cluster, change_address_cluster);
+                    // Update clusterID in the graph table
+                    service.updateSubClusterList(input_cluster, change_address_cluster);
+                } else if(input_cluster != 0) {
+                    // Change address cluster null -> Add the change to the input cluster
                     service.updateAddressCluster(input_cluster, change_hash);
                 } else {
-                    // Cluster not exists -> Create new one
+                    // Clusters not exists -> Create new one
                     ClusterDTO miniCluster = new ClusterDTO();
                     miniCluster.setCluster_id(cluster_id_counter);
                     // Update cluster ID
