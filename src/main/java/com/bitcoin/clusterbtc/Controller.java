@@ -20,7 +20,6 @@ public class Controller {
     private final Service service = new Service();
     private static Long cluster_id_counter = 1L; // ClusterID counter
 
-
     public Controller() throws SQLException {
     }
 

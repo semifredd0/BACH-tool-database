@@ -16,6 +16,7 @@ CREATE TABLE SUB_CLUSTER (
 	ADDRESS_ID_2 BIGINT REFERENCES ADDRESS(ADDRESS_ID),
 	CLUSTER_ID BIGINT NOT NULL,
 	LINK_TYPE SMALLINT NOT NULL,
+	LINK_VISIBLE_SIZE INT DEFAULT 0,
 	PRIMARY KEY(ADDRESS_ID_1,ADDRESS_ID_2)
 );
 
@@ -23,4 +24,5 @@ CREATE TABLE SUB_CLUSTER (
 select count(*) from address;
 select * from address where address_hash like 'bc%';
 select cluster_id, count(*) from sub_cluster group by cluster_id having count(*) >= 1000;
+select cluster_id, count(*) from address group by cluster_id having count(*) >= 100;
 select pg_size_pretty (pg_database_size ('cluster_btc'));

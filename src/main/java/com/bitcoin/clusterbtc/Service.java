@@ -119,16 +119,18 @@ public class Service {
 
     public void addSubCluster(List<String> addressList, short type) {
         Long clusterId = getClusterId(addressList.get(0));
-        for(int i=0; i<addressList.size()-1; i++) {
-            for (int j=i+1; j<addressList.size(); j++) {
+        for (int i = 0; i < addressList.size() - 1; i++) {
+            for (int j = i + 1; j < addressList.size(); j++) {
                 Long addressId1 = getAddress(addressList.get(i)).getAddressId();
                 Long addressId2 = getAddress(addressList.get(j)).getAddressId();
                 try {
-                    pst = con.prepareStatement("insert into SUB_CLUSTER (ADDRESS_ID_1,ADDRESS_ID_2,CLUSTER_ID,LINK_TYPE) values (?,?,?,?)");
+                    pst = con.prepareStatement("insert into SUB_CLUSTER (ADDRESS_ID_1,ADDRESS_ID_2,CLUSTER_ID,LINK_TYPE,LINK_VISIBLE_SIZE) values (?,?,?,?,?)");
                     pst.setLong(1, addressId1);
                     pst.setLong(2, addressId2);
                     pst.setLong(3, clusterId);
                     pst.setShort(4, type);
+                    // Field used to set visibility of the links in the client app
+                    pst.setInt(5, addressList.size());
                     pst.executeUpdate();
                 } catch (SQLException e) {
                     // Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Link already exists!");
